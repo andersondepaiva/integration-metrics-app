@@ -257,12 +257,6 @@ def build_chart_errors_by_tipo(df_window: pd.DataFrame, title_suffix: str, top_n
 # =============================
 uploaded = st.file_uploader("📤 Faça upload do CSV", type=["csv"]) 
 
-if uploaded is None:
-    st.info(
-        "Envie um arquivo .csv com as colunas: **qtd**, **status**, **data_integracao**, **tipo**.\n\n"
-    )
-    st.stop()
-
 init_db()
 
 if uploaded is not None:
@@ -283,10 +277,10 @@ else:
     # Sem upload: carrega base existente sem apagar
     df = load_all_from_db()
     if df.empty:
-        st.info("Nenhum dado armazenado. Faça upload de um CSV para iniciar.")
-        st.stop()
+        st.info("Nenhum dado armazenado ainda. Faça upload de um CSV para popular a base.")
+        # Mantém df vazio; validação mais abaixo mostrará aviso adequado
     else:
-        st.success(f"Usando dados já armazenados. Total atual: {len(df)} registros.")
+        st.success(f"Usando dados já armazenados. Total atual: {len[df]} registros.")
 
 # Permite ao usuário ajustar a detecção de erro (opcional)
 with st.sidebar:
