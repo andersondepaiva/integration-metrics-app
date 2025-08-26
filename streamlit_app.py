@@ -270,6 +270,7 @@ if st.button("📄 Exportar PDF (todas as abas)"):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=12)
     try:
+        image_failures = []
         for title, mask in masks.items():
             df_win = df.loc[mask].copy()
             pdf.add_page()
@@ -294,6 +295,7 @@ if st.button("📄 Exportar PDF (todas as abas)"):
                 try:
                     img_bytes = fig.to_image(format="png")  # requer kaleido
                 except Exception as e:
+                    image_failures.append(f"{title} ({tag}): {e}")
                     pdf.set_font("Helvetica", size=8)
                     pdf.set_text_color(200, 0, 0)
                     _pdf_safe_multicell(pdf, 0, 5, f"Falha ao gerar imagem ({tag}): {e}")
@@ -310,7 +312,17 @@ if st.button("📄 Exportar PDF (todas as abas)"):
                     pdf.set_text_color(200, 0, 0)
                     _pdf_safe_multicell(pdf, 0, 5, f"Falha ao inserir imagem ({tag}): {e}")
                     pdf.set_text_color(0, 0, 0)
-        pdf_bytes = pdf.output(dest='S').encode('latin1', 'replace')
+        # Página final de resumo de falhas de imagem
+        if image_failures:
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.cell(0, 8, "Resumo de Falhas de Imagem", ln=1)
+            pdf.set_font("Helvetica", size=9)
+            for fail in image_failures:
+                _pdf_safe_multicell(pdf, 0, 5, fail)
+
+        # fpdf2 retorna bytearray quando dest='S'
+        pdf_bytes = bytes(pdf.output(dest='S'))
         st.download_button(
             "Baixar PDF",
             data=pdf_bytes,
@@ -333,7 +345,7 @@ st.markdown(
     "where data_integracao is not null and parent_type is not null \n"
     "and tipo = 'envio' \n"
     "AND si.data_integracao >= (CURDATE() - INTERVAL 30 DAY) \n"
-    "group by status, data_integracao, coalesce(operacao, sis.parent_type), sis.parent_type "
+    "group by status, data_integracao, coalesce(operacao, sis.parent_type), sis.parent_type;\n\n"
     "Exporte para CSV e faça o upload no App."
 )
 
