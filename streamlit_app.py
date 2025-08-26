@@ -49,7 +49,11 @@ def init_db():
 
 
 def persist_df(df_csv: pd.DataFrame):
-    """Substitui completamente o conteúdo da tabela pelos dados do CSV (truncate + insert)."""
+    """Substitui completamente o conteúdo da tabela pelos dados do CSV (truncate + insert).
+    Caso o CSV tenha múltiplas linhas com a mesma combinação (status, data_integracao, tipo),
+    os valores de qtd são agregados (soma) para evitar violação de PK.
+    Retorna (linhas_inseridas, linhas_agrupadas_originalmente).
+    """
     # Normaliza datas mesmo se vazio, para garantir consistência
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.cursor()
@@ -57,9 +61,14 @@ def persist_df(df_csv: pd.DataFrame):
         cur.execute("DELETE FROM integracoes")
         if df_csv.empty:
             conn.commit()
-            return 0
+            return 0, 0
         rows = df_csv[["status", "data_integracao", "tipo", "qtd"]].copy()
         rows["data_integracao"] = pd.to_datetime(rows["data_integracao"]).dt.strftime("%Y-%m-%d")
+        original_count = len(rows)
+        # Agrega duplicados
+        rows = (
+            rows.groupby(["status", "data_integracao", "tipo"], as_index=False)["qtd"].sum()
+        )
         data = list(rows.itertuples(index=False, name=None))
         cur.executemany(
             """
@@ -69,7 +78,7 @@ def persist_df(df_csv: pd.DataFrame):
             data,
         )
         conn.commit()
-        return len(data)
+        return len(data), original_count
 
 
 def load_all_from_db() -> pd.DataFrame:
@@ -262,10 +271,12 @@ except Exception as ex:
     st.stop()
 
 # Persiste e carrega base consolidada
-rows_inserted = persist_df(df_upload)
+rows_inserted, original_rows = persist_df(df_upload)
 df = load_all_from_db()
 if rows_inserted:
-    st.success(f"Upload processado: {rows_inserted} registros inseridos (base substituída). Total atual: {len(df)}.")
+    reducao = original_rows - rows_inserted
+    agg_info = f" (agregadas {reducao} linhas duplicadas)" if reducao > 0 else ""
+    st.success(f"Upload processado: {rows_inserted} registros inseridos{agg_info}. Total atual: {len(df)}.")
 else:
     st.warning("Base limpa. CSV sem registros válidos.")
 
