@@ -70,6 +70,28 @@ def is_error_status(s: str) -> bool:
     )
 
 
+def _sanitize_pdf_text(text: str) -> str:
+    """Remove/normaliza caracteres fora do Latin-1 para evitar FPDFException com fontes core.
+    Substitui por '?' quando não suportado."""
+    try:
+        return text.encode("latin-1", "replace").decode("latin-1")
+    except Exception:
+        return text
+
+
+def _pdf_safe_multicell(pdf, w, h, text: str):
+    from fpdf import FPDFException  # type: ignore
+    try:
+        pdf.multi_cell(w, h, _sanitize_pdf_text(text))
+    except Exception:
+        # Tenta dividir em linhas menores caso o erro seja de quebra
+        for line in _sanitize_pdf_text(text).splitlines() or [text]:
+            try:
+                pdf.multi_cell(w, h, line)
+            except FPDFException:
+                pass
+
+
 def window_mask(df: pd.DataFrame, max_day: date, days: int) -> pd.Series:
     """Retorna um mask para últimos N dias (incluindo max_day). days=1 => somente max_day."""
     start_day = max_day - timedelta(days=days - 1)
@@ -247,50 +269,58 @@ if st.button("📄 Exportar PDF (todas as abas)"):
     from fpdf import FPDF
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=12)
-    for title, mask in masks.items():
-        df_win = df.loc[mask].copy()
-        pdf.add_page()
-        pdf.set_font("Helvetica", "B", 14)
-        pdf.cell(0, 10, f"{title}", ln=1)
-        if df_win.empty:
+    try:
+        for title, mask in masks.items():
+            df_win = df.loc[mask].copy()
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 14)
+            pdf.cell(0, 10, _sanitize_pdf_text(f"{title}"), ln=1)
             pdf.set_font("Helvetica", size=10)
-            pdf.multi_cell(0, 6, "Sem dados para este período.")
-            continue
-        # Métricas
-        total = int(df_win["qtd"].sum())
-        erros = int(df_win.loc[df_win["status"].apply(is_error_status), "qtd"].sum())
-        sucesso = total - erros
-        pdf.set_font("Helvetica", size=10)
-        pdf.multi_cell(0, 6, f"Total: {total}  |  Sucesso (est.): {sucesso}  |  Erros (est.): {erros}")
-        # Gráficos
-        status_fig = build_chart_by_status(df_win, title)
-        errors_fig, _ = build_chart_errors_by_tipo(df_win, title)
-        figures = [(status_fig, "status"), (errors_fig, "erros")]
-        for fig, tag in figures:
-            if fig is None:
+            if df_win.empty:
+                _pdf_safe_multicell(pdf, 0, 6, "Sem dados para este período.")
                 continue
-            try:
-                img_bytes = fig.to_image(format="png")  # requer kaleido
-            except Exception as e:
-                pdf.set_font("Helvetica", size=8)
-                pdf.set_text_color(200, 0, 0)
-                pdf.multi_cell(0, 5, f"Falha ao gerar imagem ({tag}): {e}")
-                pdf.set_text_color(0, 0, 0)
-                continue
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-                tmp.write(img_bytes)
-                tmp_path = tmp.name
-            # Ajuste de largura mantendo margem
-            page_width = pdf.w - 20
-            pdf.image(tmp_path, w=page_width)
-    pdf_bytes = pdf.output(dest='S').encode('latin1')
-    st.download_button(
-        "Baixar PDF",
-        data=pdf_bytes,
-        file_name="integracoes_metricas.pdf",
-        mime="application/pdf",
-        key="download_pdf_all_tabs"
-    )
+            # Métricas
+            total = int(df_win["qtd"].sum())
+            erros = int(df_win.loc[df_win["status"].apply(is_error_status), "qtd"].sum())
+            sucesso = total - erros
+            _pdf_safe_multicell(pdf, 0, 6, f"Total: {total}  |  Sucesso (est.): {sucesso}  |  Erros (est.): {erros}")
+            # Gráficos
+            status_fig = build_chart_by_status(df_win, title)
+            errors_fig, _ = build_chart_errors_by_tipo(df_win, title)
+            figures = [(status_fig, "status"), (errors_fig, "erros")]
+            for fig, tag in figures:
+                if fig is None:
+                    continue
+                try:
+                    img_bytes = fig.to_image(format="png")  # requer kaleido
+                except Exception as e:
+                    pdf.set_font("Helvetica", size=8)
+                    pdf.set_text_color(200, 0, 0)
+                    _pdf_safe_multicell(pdf, 0, 5, f"Falha ao gerar imagem ({tag}): {e}")
+                    pdf.set_text_color(0, 0, 0)
+                    continue
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                    tmp.write(img_bytes)
+                    tmp_path = tmp.name
+                page_width = pdf.w - 20
+                try:
+                    pdf.image(tmp_path, w=page_width)
+                except Exception as e:
+                    pdf.set_font("Helvetica", size=8)
+                    pdf.set_text_color(200, 0, 0)
+                    _pdf_safe_multicell(pdf, 0, 5, f"Falha ao inserir imagem ({tag}): {e}")
+                    pdf.set_text_color(0, 0, 0)
+        pdf_bytes = pdf.output(dest='S').encode('latin1', 'replace')
+        st.download_button(
+            "Baixar PDF",
+            data=pdf_bytes,
+            file_name="integracoes_metricas.pdf",
+            mime="application/pdf",
+            key="download_pdf_all_tabs"
+        )
+    except Exception as e:
+        st.error(f"Falha ao gerar PDF: {e}")
+        st.info("Verifique se a dependência 'kaleido' está instalada para exportar imagens Plotly.")
 
 # =============================
 # Rodapé
