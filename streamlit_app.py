@@ -25,8 +25,9 @@ st.caption(
 )
 
 # Paleta de cores
-SUCCESS_COLOR = "#7defa1"  # verde claro
-ERROR_COLOR = "#ffabab"    # vermelho claro
+SUCCESS_COLOR = "#7defa1"   # verde claro
+ERROR_COLOR = "#FFABAB"     # vermelho claro (erros)
+PARTIAL_COLOR = "#FFFDB8"   # amarelo claro (integrado parcial)
 NEUTRAL_COLOR = "#f2f2f2"
 
 # CSS para caixas KPI (inserido uma única vez)
@@ -257,13 +258,16 @@ def build_chart_by_status(df_window: pd.DataFrame, title_suffix: str):
         df_window.groupby(["dia", "status"], as_index=False)["qtd"].sum()
         .sort_values("dia")
     )
-    # Define cores desejadas: sucesso => verde, erro => vermelho
+    # Define cores desejadas: sucesso => verde, integrado_parcial => amarelo, erro => vermelho
     color_map = {}
     for s in agg["status"].unique():
-        if is_error_status(str(s)):
-            color_map[s] = "#ffabab"  # vermelho claro para erro
+        s_norm = str(s).lower()
+        if "integrado_parcial" in s_norm:
+            color_map[s] = PARTIAL_COLOR
+        elif is_error_status(s_norm):
+            color_map[s] = ERROR_COLOR
         else:
-            color_map[s] = "#7defa1"  # verde claro para sucesso
+            color_map[s] = SUCCESS_COLOR
     fig = px.bar(
         agg,
         x="dia",
@@ -320,7 +324,7 @@ def build_chart_errors_by_tipo(df_window: pd.DataFrame, title_suffix: str, top_n
         y="qtd",
         color="tipo",
         barmode="group",
-        title=f"Erros por tipo (Top {top_n}) ao longo do tempo — {title_suffix}",
+        title=f"Erros por tipo (Ao longo do tempo — {title_suffix}",
         labels={"dia": "Dia", "qtd": "Quantidade", "tipo": "Tipo"},
     )
     return fig, agg
@@ -426,7 +430,7 @@ for (title, df_win), col in zip(window_dfs.items(), cols):
         st.markdown(
             f"""
             <div class='kpi-box' style='background:{SUCCESS_COLOR};'>
-                <div class='kpi-label'>Sucesso (est.)</div>
+                <div class='kpi-label'>Sucesso</div>
                 <div class='kpi-value'>{sucesso} <span class='kpi-badge-success'>{sucesso_pct:.1f}%</span></div>
             </div>
             """.replace('.', ','),
@@ -435,7 +439,7 @@ for (title, df_win), col in zip(window_dfs.items(), cols):
         st.markdown(
             f"""
             <div class='kpi-box' style='background:{ERROR_COLOR};'>
-                <div class='kpi-label'>Erros (est.)</div>
+                <div class='kpi-label'>Erros</div>
                 <div class='kpi-value'>{erros} <span class='kpi-badge-error'>{erros_pct:.1f}%</span></div>
             </div>
             """.replace('.', ','),
