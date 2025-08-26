@@ -1,4 +1,6 @@
 import io
+import sqlite3
+from pathlib import Path
 import tempfile
 import pandas as pd
 import numpy as np
@@ -21,6 +23,69 @@ st.caption(
     "O app calcula uma visão do dia atual (com base no último dia do dataset), últimos 7 dias e últimos 30 dias,"
     " e destaca as integrações com mais erros (por tipo)."
 )
+
+# =============================
+# Configuração de persistência
+# =============================
+DB_PATH = Path("integracoes.db")
+
+
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS integracoes (
+                status TEXT NOT NULL,
+                data_integracao TEXT NOT NULL,
+                tipo TEXT NOT NULL,
+                qtd INTEGER NOT NULL,
+                PRIMARY KEY (status, data_integracao, tipo)
+            )
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_integracoes_data ON integracoes(data_integracao)")
+        conn.commit()
+
+
+def persist_df(df_csv: pd.DataFrame):
+    """Substitui completamente o conteúdo da tabela pelos dados do CSV (truncate + insert)."""
+    # Normaliza datas mesmo se vazio, para garantir consistência
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        # Limpa base antes de inserir novos dados
+        cur.execute("DELETE FROM integracoes")
+        if df_csv.empty:
+            conn.commit()
+            return 0
+        rows = df_csv[["status", "data_integracao", "tipo", "qtd"]].copy()
+        rows["data_integracao"] = pd.to_datetime(rows["data_integracao"]).dt.strftime("%Y-%m-%d")
+        data = list(rows.itertuples(index=False, name=None))
+        cur.executemany(
+            """
+            INSERT INTO integracoes (status, data_integracao, tipo, qtd)
+            VALUES (?, ?, ?, ?)
+            """,
+            data,
+        )
+        conn.commit()
+        return len(data)
+
+
+def load_all_from_db() -> pd.DataFrame:
+    if not DB_PATH.exists():
+        return pd.DataFrame(columns=["status", "data_integracao", "tipo", "qtd"])  # vazio
+    with sqlite3.connect(DB_PATH) as conn:
+        df_db = pd.read_sql_query(
+            "SELECT status, data_integracao, tipo, qtd FROM integracoes",
+            conn,
+        )
+    if df_db.empty:
+        return df_db
+    df_db["data_integracao"] = pd.to_datetime(df_db["data_integracao"], errors="coerce")
+    df_db = df_db.dropna(subset=["data_integracao"]).copy()
+    df_db["dia"] = df_db["data_integracao"].dt.date
+    return df_db
 
 # =============================
 # Helpers
@@ -189,11 +254,20 @@ if uploaded is None:
     )
     st.stop()
 
+init_db()
 try:
-    df = load_csv(uploaded)
+    df_upload = load_csv(uploaded)
 except Exception as ex:
     st.error(f"Falha ao carregar CSV: {ex}")
     st.stop()
+
+# Persiste e carrega base consolidada
+rows_inserted = persist_df(df_upload)
+df = load_all_from_db()
+if rows_inserted:
+    st.success(f"Upload processado: {rows_inserted} registros inseridos (base substituída). Total atual: {len(df)}.")
+else:
+    st.warning("Base limpa. CSV sem registros válidos.")
 
 # Permite ao usuário ajustar a detecção de erro (opcional)
 with st.sidebar:
@@ -215,12 +289,12 @@ if selected_errors:
 # =============================
 # Janelas de tempo
 # =============================
-max_day = df["dia"].max()
+max_day = df["dia"].max() if not df.empty else None
 if pd.isna(max_day):
     st.warning("Dataset sem datas válidas em data_integracao.")
     st.stop()
 
-st.success(f"Data de referência (último dia no dataset): **{max_day}**")
+st.success(f"Data de referência (último dia armazenado no SQLite): **{max_day}**")
 
 masks = {
     "Hoje (baseado no último dia do dataset)": window_mask(df, max_day, days=1),
