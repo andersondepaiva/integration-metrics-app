@@ -404,8 +404,9 @@ if pd.isna(max_day):
 
 st.success(f"Data de referência (último dia armazenado no SQLite): **{max_day}**")
 
+label_hoje = str(max_day)  # mostra a própria data (ISO) em vez de 'Hoje'
 masks = {
-    "Hoje (baseado no último dia do dataset)": window_mask(df, max_day, days=1),
+    label_hoje: window_mask(df, max_day, days=1),
     "Últimos 7 dias": window_mask(df, max_day, days=7),
     "Últimos 30 dias": window_mask(df, max_day, days=30),
 }
