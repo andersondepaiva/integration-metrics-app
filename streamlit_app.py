@@ -158,7 +158,6 @@ uploaded = st.file_uploader("📤 Faça upload do CSV", type=["csv"])
 if uploaded is None:
     st.info(
         "Envie um arquivo .csv com as colunas: **qtd**, **status**, **data_integracao**, **tipo**, **parent_type**.\n\n"
-        "Dica: a consulta SQL já usa `si.data_integracao >= (CURDATE() - INTERVAL 30 DAY)` para trazer 30 dias."
     )
     st.stop()
 
@@ -239,19 +238,7 @@ for (title, mask), tab in zip(masks.items(), abas):
 # =============================
 # Rodapé
 # =============================
-st.markdown(
-    "---\n"
-    "**Como executar localmente:**\n\n"
-    "1. Crie um virtualenv (opcional) e instale dependências:\n\n"
-    "   ```bash\n"
-    "   pip install -r requirements.txt\n"
-    "   ```\n\n"
-    "2. Rode o app:\n\n"
-    "   ```bash\n"
-    "   streamlit run streamlit_app_integracoes.py\n"
-    "   ```\n\n"
-    "3. Faça upload do CSV exportado pela sua query."
-)
+
 
 # =============================
 # requirements.txt (gerado automaticamente)
