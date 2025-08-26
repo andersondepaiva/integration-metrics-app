@@ -418,7 +418,7 @@ for (title, df_win), col in zip(window_dfs.items(), cols_raw):
 # Rodapé
 # =============================
 st.markdown(
-    "Exemplo de query base (ajuste conforme sua origem de dados):"
+    "Query base utilizada (se alterar, mantenha a estrutura):"
 )
 st.code(
     """select
