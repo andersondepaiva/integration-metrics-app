@@ -178,11 +178,22 @@ def kpi_row(df_window: pd.DataFrame):
     err_mask = df_window["status"].apply(is_error_status)
     erros = int(df_window.loc[err_mask, "qtd"].sum())
     sucesso = int(total - erros)
+    if total > 0:
+        sucesso_pct = sucesso / total * 100
+        erros_pct = erros / total * 100
+    else:
+        sucesso_pct = erros_pct = 0.0
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Total de integrações", f"{total:,}".replace(",", "."))
-    c2.metric("Sucesso (estimado)", f"{sucesso:,}".replace(",", "."))
-    c3.metric("Erros (estimado)", f"{erros:,}".replace(",", "."))
+    c2.metric(
+        "Sucesso (estimado)",
+        f"{sucesso:,}".replace(",", ".") + f" ({sucesso_pct:.1f}% )".replace(".", ",")
+    )
+    c3.metric(
+        "Erros (estimado)",
+        f"{erros:,}".replace(",", ".") + f" ({erros_pct:.1f}% )".replace(".", ",")
+    )
 
 
 def chart_by_status(df_window: pd.DataFrame, title_suffix: str):
@@ -335,9 +346,20 @@ for (title, df_win), col in zip(window_dfs.items(), cols):
         total = int(df_win["qtd"].sum())
         erros = int(df_win.loc[df_win["status"].apply(is_error_status), "qtd"].sum())
         sucesso = total - erros
+        if total > 0:
+            sucesso_pct = sucesso / total * 100
+            erros_pct = erros / total * 100
+        else:
+            sucesso_pct = erros_pct = 0.0
         st.metric("Total", f"{total:,}".replace(",", "."))
-        st.metric("Sucesso (est.)", f"{sucesso:,}".replace(",", "."))
-        st.metric("Erros (est.)", f"{erros:,}".replace(",", "."))
+        st.metric(
+            "Sucesso ",
+            f"{sucesso:,}".replace(",", ".") + f" ({sucesso_pct:.1f}% )".replace(".", ",")
+        )
+        st.metric(
+            "Erros ",
+            f"{erros:,}".replace(",", ".") + f" ({erros_pct:.1f}% )".replace(".", ",")
+        )
 
 # Linha de gráficos por status
 st.subheader("Gráficos por Status")
