@@ -239,87 +239,16 @@ for (title, mask), tab in zip(masks.items(), abas):
 # Rodapé
 # =============================
 st.markdown(
-" FIELDS TERMINATED BY ',' ENCLOSED BY '"'
-"
-" LINES TERMINATED BY '\n';
-"
-" ```
+"- Rode a query abaixo:
+select  count(*) as qtd, status, data_integracao, tipo, sis.parent_type from saude_integracao si
+inner join saude_integracao_saude_integracao_situacao_1_c sisisc on sisisc.saude_integracao_saude_integracao_situacao_1saude_integracao_ida = si.id and si.deleted = 0
+inner join saude_integracao_situacao sis on sisisc.saude_intece37ituacao_idb = sis.id and sis.deleted = 0
+where data_integracao is not null and parent_type is not null
+AND si.data_integracao >= (CURDATE() - INTERVAL 30 DAY)
+group by status, data_integracao, tipo, sis.parent_type
 
-
-"
-"3) **Faça upload no app**: clique em *📤 Faça upload do CSV* e selecione o arquivo.
-
-
-"
-" - Cabeçalhos esperados: **qtd, status, data_integracao, tipo, parent_type** (aceita também **sis.parent_type**).
-"
-" - `data_integracao` deve estar em formato reconhecível (ex.: `YYYY-MM-DD` ou `YYYY-MM-DD HH:MM:SS`).
-"
-" - O app detecta automaticamente `,` ou `;` como separador.
-
-
-"
-"4) **Navegue nas abas**: *Hoje*, *Últimos 7 dias*, *Últimos 30 dias*.
-
-
-"
-" - KPIs (Total, Sucesso, Erros).
-"
-" - Gráfico por **status** ao longo dos dias.
-"
-" - **Top parent_type com mais erros** ao longo do tempo + download do CSV.
-
-
-"
-"**Dicas**:
-
-
-"
-"- Se o seu status de erro é diferente (ex.: `PROCESSING_ERROR`, `INVALID`), ajuste na barra lateral.
-"
-"- Se aparecer mensagem de 'Sem dados para este período', verifique se o CSV realmente tem linhas nos últimos 30 dias.
-"
-"- Caso use `INTO OUTFILE`, confirme a pasta permitida em `secure_file_priv`.
-"
-"- Para reproduzir: `pip install -r requirements.txt` e `streamlit run streamlit_app_integracoes.py`.
-"
-)
-"
-" group by status, data_integracao, tipo, sis.parent_type
-"
-" order by data_integracao;
-"
-" ```
-
-
-"
-"2. **Exporte o resultado para CSV** (o arquivo deve conter as colunas: `qtd`, `status`, `data_integracao`, `tipo`, `parent_type`).
-
-
-"
-"3. **Abra o app Streamlit** localmente:
-
-
-"
-" ```bash
-"
-" pip install -r requirements.txt
-"
-" streamlit run streamlit_app_integracoes.py
-"
-" ```
-
-
-"
-"4. **Faça upload do CSV** no app.
-
-
-"
-"5. Navegue pelas abas para ver as visões: **Hoje**, **Últimos 7 dias**, **Últimos 30 dias**.
-
-
-"
-"6. Explore os gráficos e, se necessário, baixe os CSVs agregados gerados pelo app."
+- Exporte para CSV
+- Faça no upload no App"
 )
 
 # =============================
