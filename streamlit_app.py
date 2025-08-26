@@ -264,21 +264,29 @@ if uploaded is None:
     st.stop()
 
 init_db()
-try:
-    df_upload = load_csv(uploaded)
-except Exception as ex:
-    st.error(f"Falha ao carregar CSV: {ex}")
-    st.stop()
 
-# Persiste e carrega base consolidada
-rows_inserted, original_rows = persist_df(df_upload)
-df = load_all_from_db()
-if rows_inserted:
-    reducao = original_rows - rows_inserted
-    agg_info = f" (agregadas {reducao} linhas duplicadas)" if reducao > 0 else ""
-    st.success(f"Upload processado: {rows_inserted} registros inseridos{agg_info}. Total atual: {len(df)}.")
+if uploaded is not None:
+    try:
+        df_upload = load_csv(uploaded)
+    except Exception as ex:
+        st.error(f"Falha ao carregar CSV: {ex}")
+        st.stop()
+    rows_inserted, original_rows = persist_df(df_upload)
+    df = load_all_from_db()
+    if rows_inserted:
+        reducao = original_rows - rows_inserted
+        agg_info = f" (agregadas {reducao} linhas duplicadas)" if reducao > 0 else ""
+        st.success(f"Upload processado: {rows_inserted} registros inseridos{agg_info}. Total atual: {len(df)}.")
+    else:
+        st.warning("Base limpa. CSV sem registros válidos.")
 else:
-    st.warning("Base limpa. CSV sem registros válidos.")
+    # Sem upload: carrega base existente sem apagar
+    df = load_all_from_db()
+    if df.empty:
+        st.info("Nenhum dado armazenado. Faça upload de um CSV para iniciar.")
+        st.stop()
+    else:
+        st.success(f"Usando dados já armazenados. Total atual: {len(df)} registros.")
 
 # Permite ao usuário ajustar a detecção de erro (opcional)
 with st.sidebar:
