@@ -144,8 +144,9 @@ def chart_errors_by_parent_type(df_window: pd.DataFrame, title_suffix: str, top_
         st.download_button(
             "Baixar CSV (erros por dia x parent_type)",
             data=csv,
-            file_name="erros_por_dia_parent_type.csv",
+            file_name=f"erros_por_dia_parent_type_{title_suffix.replace(' ', '_').lower()}.csv",
             mime="text/csv",
+            key=f"dl_errors_{title_suffix.replace(' ', '_').lower()}"
         )
 
 
@@ -232,6 +233,7 @@ for (title, mask), tab in zip(masks.items(), abas):
                 data=csv,
                 file_name=f"dados_{title.replace(' ', '_').lower()}.csv",
                 mime="text/csv",
+                key=f"dl_periodo_{title.replace(' ', '_').lower()}"
             )
 
 # =============================
@@ -242,7 +244,7 @@ st.markdown(
     "**Como executar localmente:**\n\n"
     "1. Crie um virtualenv (opcional) e instale dependências:\n\n"
     "   ```bash\n"
-    "   pip install streamlit pandas plotly\n"
+    "   pip install -r requirements.txt\n"
     "   ```\n\n"
     "2. Rode o app:\n\n"
     "   ```bash\n"
@@ -250,3 +252,12 @@ st.markdown(
     "   ```\n\n"
     "3. Faça upload do CSV exportado pela sua query."
 )
+
+# =============================
+# requirements.txt (gerado automaticamente)
+# =============================
+# Salve este conteúdo em um arquivo separado chamado requirements.txt
+#
+# streamlit
+# pandas
+# plotly
