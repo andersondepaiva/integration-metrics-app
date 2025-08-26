@@ -16,9 +16,9 @@ st.set_page_config(
 
 st.title("📈 Visões de Integrações a partir de CSV")
 st.caption(
-    "Faça upload do CSV gerado pela sua query (colunas esperadas: qtd, status, data_integracao, tipo, parent_type).\n"
+    "Faça upload do CSV gerado pela sua query (colunas esperadas: qtd, status, data_integracao, tipo).\n"
     "O app calcula uma visão do dia atual (com base no último dia do dataset), últimos 7 dias e últimos 30 dias,"
-    " e destaca as integrações com mais erros (por parent_type)."
+    " e destaca as integrações com mais erros (por tipo)."
 )
 
 # =============================
@@ -37,12 +37,8 @@ def load_csv(file) -> pd.DataFrame:
     # Normaliza nomes de colunas
     df.columns = [c.strip().lower() for c in df.columns]
 
-    # Renomeia se vier como "sis.parent_type"
-    if "sis.parent_type" in df.columns and "parent_type" not in df.columns:
-        df = df.rename(columns={"sis.parent_type": "parent_type"})
-
     # Valida colunas mínimas
-    required = {"qtd", "status", "data_integracao", "tipo", "parent_type"}
+    required = {"qtd", "status", "data_integracao", "tipo"}
     missing = required - set(df.columns)
     if missing:
         raise ValueError(f"CSV não contém as colunas obrigatórias: {', '.join(sorted(missing))}")
@@ -51,7 +47,7 @@ def load_csv(file) -> pd.DataFrame:
     df["qtd"] = pd.to_numeric(df["qtd"], errors="coerce").fillna(0).astype(int)
     df["status"] = df["status"].astype(str)
     df["tipo"] = df["tipo"].astype(str)
-    df["parent_type"] = df["parent_type"].astype(str)
+    # Garantia de consistência: nada a fazer além das colunas obrigatórias
 
     # data_integracao -> datetime (sem timezone)
     df["data_integracao"] = pd.to_datetime(df["data_integracao"], errors="coerce")
@@ -108,7 +104,7 @@ def chart_by_status(df_window: pd.DataFrame, title_suffix: str):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def chart_errors_by_parent_type(df_window: pd.DataFrame, title_suffix: str, top_n: int = 8):
+def chart_errors_by_tipo(df_window: pd.DataFrame, title_suffix: str, top_n: int = 8):
     # Filtra somente linhas de erro
     err_mask = df_window["status"].apply(is_error_status)
     df_err = df_window.loc[err_mask].copy()
@@ -157,7 +153,7 @@ uploaded = st.file_uploader("📤 Faça upload do CSV", type=["csv"])
 
 if uploaded is None:
     st.info(
-        "Envie um arquivo .csv com as colunas: **qtd**, **status**, **data_integracao**, **tipo**, **parent_type**.\n\n"
+        "Envie um arquivo .csv com as colunas: **qtd**, **status**, **data_integracao**, **tipo**.\n\n"
     )
     st.stop()
 
@@ -219,9 +215,8 @@ for (title, mask), tab in zip(masks.items(), abas):
 
         # Gráfico por status
         chart_by_status(df_win, title_suffix=title)
-
-        # Erros por parent_type
-        chart_errors_by_parent_type(df_win, title_suffix=title, top_n=8)
+        # Erros por tipo
+        chart_errors_by_tipo(df_win, title_suffix=title, top_n=8)
 
         # Tabela base do período (opcional)
         with st.expander("Ver dados brutos do período"):
@@ -239,16 +234,15 @@ for (title, mask), tab in zip(masks.items(), abas):
 # Rodapé
 # =============================
 st.markdown(
-"Rode a query abaixo:\n"
-"select  count(*) as qtd, status, data_integracao, tipo, sis.parent_type from saude_integracao si\n"
-"inner join saude_integracao_saude_integracao_situacao_1_c sisisc on sisisc.saude_integracao_saude_integracao_situacao_1saude_integracao_ida = si.id and si.deleted = 0\n"
-"inner join saude_integracao_situacao sis on sisisc.saude_intece37ituacao_idb = sis.id and sis.deleted = 0\n"
-"where data_integracao is not null and parent_type is not null\n"
-"AND si.data_integracao >= (CURDATE() - INTERVAL 30 DAY)\n"
-"group by status, data_integracao, tipo, sis.parent_type\n"
-"\n"
-"Exporte para CSV\n"
-"Faça no upload no App"
+    "Exemplo de query base (ajuste conforme sua origem de dados):\n"
+    "select  count(*) as qtd, status, data_integracao, coalesce(operacao, sis.parent_type) as tipo from saude_integracao si \n"
+    "inner join saude_integracao_saude_integracao_situacao_1_c sisisc on sisisc.saude_integracao_saude_integracao_situacao_1saude_integracao_ida = si.id and si.deleted = 0 \n"
+    "inner join saude_integracao_situacao sis on sisisc.saude_intece37ituacao_idb = sis.id and sis.deleted = 0 \n"
+    "where data_integracao is not null and parent_type is not null \n"
+    "and tipo = 'envio' \n"
+    "AND si.data_integracao >= (CURDATE() - INTERVAL 30 DAY) \n"
+    "group by status, data_integracao, coalesce(operacao, sis.parent_type), sis.parent_type "
+    "Exporte para CSV e faça o upload no App."
 )
 
 # =============================
