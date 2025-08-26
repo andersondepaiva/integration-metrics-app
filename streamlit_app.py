@@ -276,7 +276,7 @@ for (title, df_win), col in zip(window_dfs.items(), cols_status):
         status_figs[title] = fig
 
 # Linha de gráficos de erros por tipo
-st.subheader("Gráficos de Erros por Tipo (Top 8)")
+st.subheader("Gráficos de Erros por Tipo ")
 cols_errors = st.columns(len(window_dfs))
 max_errors_y = 0
 error_figs = {}
