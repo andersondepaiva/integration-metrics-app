@@ -259,6 +259,7 @@ uploaded = st.file_uploader("📤 Faça upload do CSV", type=["csv"])
 
 init_db()
 
+df: pd.DataFrame
 if uploaded is not None:
     try:
         df_upload = load_csv(uploaded)
@@ -274,13 +275,12 @@ if uploaded is not None:
     else:
         st.warning("Base limpa. CSV sem registros válidos.")
 else:
-    # Sem upload: carrega base existente sem apagar
     df = load_all_from_db()
     if df.empty:
         st.info("Nenhum dado armazenado ainda. Faça upload de um CSV para popular a base.")
-        # Mantém df vazio; validação mais abaixo mostrará aviso adequado
+        st.stop()
     else:
-        st.success(f"Usando dados já armazenados. Total atual: {len[df]} registros.")
+        st.success(f"Usando dados já armazenados. Total atual: {len(df)} registros.")
 
 # Permite ao usuário ajustar a detecção de erro (opcional)
 with st.sidebar:
