@@ -335,6 +335,96 @@ if st.button("📄 Exportar PDF (todas as abas)"):
         st.info("Verifique se a dependência 'kaleido' está instalada para exportar imagens Plotly.")
 
 # =============================
+# Exportação imagem única (todas as abas)
+# =============================
+st.write("---")
+if st.button("🖼️ Exportar Imagem (todas as abas)"):
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        combined_sections = []
+        max_width = 0
+        # Fonte básica
+        try:
+            font_title = ImageFont.truetype("arial.ttf", 32)
+            font_sub = ImageFont.truetype("arial.ttf", 18)
+        except Exception:
+            font_title = ImageFont.load_default()
+            font_sub = ImageFont.load_default()
+
+        for title, mask in masks.items():
+            df_win = df.loc[mask].copy()
+            # Construção de gráficos
+            status_fig = build_chart_by_status(df_win, title)
+            errors_fig, _ = build_chart_errors_by_tipo(df_win, title)
+            figs = [(status_fig, "status"), (errors_fig, "erros")]
+            fig_images = []
+            for fig, tag in figs:
+                if fig is None:
+                    continue
+                try:
+                    img_bytes = fig.to_image(format="png")  # kaleido
+                    im = Image.open(io.BytesIO(img_bytes))
+                    fig_images.append(im)
+                except Exception:
+                    pass
+            # Métricas
+            if df_win.empty:
+                total = sucesso = erros = 0
+            else:
+                total = int(df_win["qtd"].sum())
+                erros = int(df_win.loc[df_win["status"].apply(is_error_status), "qtd"].sum())
+                sucesso = total - erros
+
+            # Calcular largura base (maior gráfico)
+            section_width = max((im.width for im in fig_images), default=1200)
+            padding = 24
+            header_height = 90
+            metrics_height = 40
+            content_height = sum(im.height for im in fig_images)
+            section_height = header_height + metrics_height + content_height + padding
+            section_img = Image.new("RGB", (section_width, section_height), (255, 255, 255))
+            draw = ImageDraw.Draw(section_img)
+            y = 10
+            draw.text((10, y), title, font=font_title, fill=(0, 0, 0))
+            y += 50
+            metrics_text = f"Total: {total}  |  Sucesso (est.): {sucesso}  |  Erros (est.): {erros}"
+            draw.text((10, y), metrics_text, font=font_sub, fill=(20, 20, 20))
+            y += metrics_height
+            for im in fig_images:
+                # Centraliza se menor
+                x = (section_width - im.width) // 2
+                section_img.paste(im, (x, y))
+                y += im.height
+            combined_sections.append(section_img)
+            max_width = max(max_width, section_width)
+
+        if not combined_sections:
+            st.warning("Falha ao gerar gráficos para imagem.")
+        else:
+            total_height = sum(img.height for img in combined_sections) + (len(combined_sections)-1)*16
+            final_img = Image.new("RGB", (max_width, total_height), (255, 255, 255))
+            current_y = 0
+            spacer = Image.new("RGB", (max_width, 16), (255, 255, 255))
+            for idx, sec in enumerate(combined_sections):
+                final_img.paste(sec, (0, current_y))
+                current_y += sec.height
+                if idx < len(combined_sections)-1:
+                    final_img.paste(spacer, (0, current_y))
+                    current_y += 16
+            out_buf = io.BytesIO()
+            final_img.save(out_buf, format="PNG")
+            st.download_button(
+                "Baixar Imagem Consolidada",
+                data=out_buf.getvalue(),
+                file_name="integracoes_metricas.png",
+                mime="image/png",
+                key="download_image_all_tabs"
+            )
+    except Exception as e:
+        st.error(f"Falha ao gerar imagem: {e}")
+        st.info("Verifique se as dependências 'kaleido' e 'Pillow' estão instaladas.")
+
+# =============================
 # Rodapé
 # =============================
 st.markdown(
