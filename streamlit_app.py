@@ -24,6 +24,38 @@ st.caption(
     " e destaca as integrações com mais erros (por tipo)."
 )
 
+# Paleta de cores
+SUCCESS_COLOR = "#7defa1"  # verde claro
+ERROR_COLOR = "#ffabab"    # vermelho claro
+NEUTRAL_COLOR = "#f2f2f2"
+
+# CSS para caixas KPI (inserido uma única vez)
+st.markdown(
+    f"""
+    <style>
+    .kpi-box {{
+        border-radius: 10px;
+        padding: 10px 14px 12px 14px;
+        margin-bottom: 10px;
+        background: linear-gradient(135deg, rgba(255,255,255,0.65), rgba(255,255,255,0.35));
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        font-family: 'Segoe UI', Arial, sans-serif;
+        border: 1px solid rgba(0,0,0,0.05);
+        backdrop-filter: blur(4px);
+    }}
+    .kpi-label {{ font-size: 0.70rem; text-transform: uppercase; letter-spacing: .07em; color:#333; margin-bottom:4px; font-weight:600; }}
+    .kpi-value {{ font-size: 1.15rem; font-weight:600; line-height:1.15; color:#111; }}
+    .kpi-badge-success {{ background:{SUCCESS_COLOR}; }}
+    .kpi-badge-error {{ background:{ERROR_COLOR}; }}
+    .kpi-badge-success, .kpi-badge-error {{
+        display:inline-block; padding:2px 6px; border-radius:4px; font-size:.65rem; margin-left:6px; vertical-align:middle; color:#111;
+        box-shadow: 0 0 0 1px rgba(0,0,0,0.05) inset;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # =============================
 # Configuração de persistência
 # =============================
@@ -183,16 +215,33 @@ def kpi_row(df_window: pd.DataFrame):
         erros_pct = erros / total * 100
     else:
         sucesso_pct = erros_pct = 0.0
-
     c1, c2, c3 = st.columns(3)
-    c1.metric("Total de integrações", f"{total:,}".replace(",", "."))
-    c2.metric(
-        "Sucesso (estimado)",
-        f"{sucesso:,}".replace(",", ".") + f" ({sucesso_pct:.1f}% )".replace(".", ",")
+    c1.markdown(
+        f"""
+        <div class='kpi-box' style='background:{NEUTRAL_COLOR};'>
+            <div class='kpi-label'>Total</div>
+            <div class='kpi-value'>{total}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    c3.metric(
-        "Erros (estimado)",
-        f"{erros:,}".replace(",", ".") + f" ({erros_pct:.1f}% )".replace(".", ",")
+    c2.markdown(
+        f"""
+        <div class='kpi-box' style='background:{SUCCESS_COLOR};'>
+            <div class='kpi-label'>Sucesso (est.)</div>
+            <div class='kpi-value'>{sucesso} <span class='kpi-badge-success'>{sucesso_pct:.1f}%</span></div>
+        </div>
+        """.replace('.', ','),
+        unsafe_allow_html=True,
+    )
+    c3.markdown(
+        f"""
+        <div class='kpi-box' style='background:{ERROR_COLOR};'>
+            <div class='kpi-label'>Erros (est.)</div>
+            <div class='kpi-value'>{erros} <span class='kpi-badge-error'>{erros_pct:.1f}%</span></div>
+        </div>
+        """.replace('.', ','),
+        unsafe_allow_html=True,
     )
 
 
@@ -208,14 +257,28 @@ def build_chart_by_status(df_window: pd.DataFrame, title_suffix: str):
         df_window.groupby(["dia", "status"], as_index=False)["qtd"].sum()
         .sort_values("dia")
     )
-    return px.bar(
+    # Define cores desejadas: sucesso => verde, erro => vermelho
+    color_map = {}
+    for s in agg["status"].unique():
+        if is_error_status(str(s)):
+            color_map[s] = "#ffabab"  # vermelho claro para erro
+        else:
+            color_map[s] = "#7defa1"  # verde claro para sucesso
+    fig = px.bar(
         agg,
         x="dia",
         y="qtd",
         color="status",
         title=f"Integrações por dia e status — {title_suffix}",
-        labels={"dia": "Dia", "qtd": "Quantidade"},
+        labels={"dia": "Dia", "qtd": "Quantidade", "status": "Status"},
+        color_discrete_map=color_map,
     )
+    # Ordena legenda: Sucessos primeiro (não erro), depois erros
+    ordered = sorted(agg["status"].unique(), key=lambda s: (is_error_status(str(s)), str(s)))
+    fig.update_layout(legend=dict(traceorder="normal"))
+    # Reforça ordem das categorias no eixo/legenda
+    fig.update_traces()
+    return fig
 
 
 def chart_errors_by_tipo(df_window: pd.DataFrame, title_suffix: str, top_n: int = 8):
@@ -351,14 +414,32 @@ for (title, df_win), col in zip(window_dfs.items(), cols):
             erros_pct = erros / total * 100
         else:
             sucesso_pct = erros_pct = 0.0
-        st.metric("Total", f"{total:,}".replace(",", "."))
-        st.metric(
-            "Sucesso ",
-            f"{sucesso:,}".replace(",", ".") + f" ({sucesso_pct:.1f}% )".replace(".", ",")
+        st.markdown(
+            f"""
+            <div class='kpi-box' style='background:{NEUTRAL_COLOR};'>
+                <div class='kpi-label'>Total</div>
+                <div class='kpi-value'>{total}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        st.metric(
-            "Erros ",
-            f"{erros:,}".replace(",", ".") + f" ({erros_pct:.1f}% )".replace(".", ",")
+        st.markdown(
+            f"""
+            <div class='kpi-box' style='background:{SUCCESS_COLOR};'>
+                <div class='kpi-label'>Sucesso (est.)</div>
+                <div class='kpi-value'>{sucesso} <span class='kpi-badge-success'>{sucesso_pct:.1f}%</span></div>
+            </div>
+            """.replace('.', ','),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"""
+            <div class='kpi-box' style='background:{ERROR_COLOR};'>
+                <div class='kpi-label'>Erros (est.)</div>
+                <div class='kpi-value'>{erros} <span class='kpi-badge-error'>{erros_pct:.1f}%</span></div>
+            </div>
+            """.replace('.', ','),
+            unsafe_allow_html=True,
         )
 
 # Linha de gráficos por status
