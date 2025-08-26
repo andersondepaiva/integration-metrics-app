@@ -227,39 +227,102 @@ masks = {
     "Últimos 30 dias": window_mask(df, max_day, days=30),
 }
 
-# =============================
-# Abas por janela
-# =============================
-aba_hoje, aba_7d, aba_30d = st.tabs(list(masks.keys()))
-abas = [aba_hoje, aba_7d, aba_30d]
+###############################
+# Layout comparativo (lado a lado)
+###############################
+st.header("Comparativo entre janelas de tempo")
 
-for (title, mask), tab in zip(masks.items(), abas):
-    with tab:
-        df_win = df.loc[mask].copy()
-        st.subheader(title)
+# Pré-calcula dataframes por janela
+window_dfs = {title: df.loc[mask].copy() for title, mask in masks.items()}
+
+# Linha de KPIs (cada janela em uma coluna)
+st.subheader("KPIs")
+cols = st.columns(len(window_dfs))
+for (title, df_win), col in zip(window_dfs.items(), cols):
+    with col:
+        st.markdown(f"**{title}**")
         if df_win.empty:
-            st.info("Sem dados para este período.")
+            st.info("Sem dados.")
             continue
+        total = int(df_win["qtd"].sum())
+        erros = int(df_win.loc[df_win["status"].apply(is_error_status), "qtd"].sum())
+        sucesso = total - erros
+        st.metric("Total", f"{total:,}".replace(",", "."))
+        st.metric("Sucesso (est.)", f"{sucesso:,}".replace(",", "."))
+        st.metric("Erros (est.)", f"{erros:,}".replace(",", "."))
 
-        # KPIs
-        kpi_row(df_win)
+# Linha de gráficos por status
+st.subheader("Gráficos por Status")
+cols_status = st.columns(len(window_dfs))
+# Para tentar comparação mais justa, mesma escala Y se possível
+max_status_y = 0
+status_figs = {}
+for title, df_win in window_dfs.items():
+    if not df_win.empty:
+        agg_tmp = df_win.groupby(["dia", "status"], as_index=False)["qtd"].sum()
+        if not agg_tmp.empty:
+            max_status_y = max(max_status_y, agg_tmp["qtd"].max())
+for (title, df_win), col in zip(window_dfs.items(), cols_status):
+    with col:
+        st.markdown(f"**{title}**")
+        if df_win.empty:
+            st.info("Sem dados.")
+            continue
+        fig = build_chart_by_status(df_win, title)
+        if max_status_y > 0:
+            fig.update_yaxes(range=[0, max_status_y * 1.05])
+        st.plotly_chart(fig, use_container_width=True)
+        status_figs[title] = fig
 
-        # Gráfico por status
-        chart_by_status(df_win, title_suffix=title)
-        # Erros por tipo
-        chart_errors_by_tipo(df_win, title_suffix=title, top_n=8)
-
-        # Tabela base do período (opcional)
-        with st.expander("Ver dados brutos do período"):
-            st.dataframe(df_win.sort_values(["dia", "status", "tipo"]), use_container_width=True)
-            csv = df_win.to_csv(index=False).encode("utf-8")
+# Linha de gráficos de erros por tipo
+st.subheader("Gráficos de Erros por Tipo (Top 8)")
+cols_errors = st.columns(len(window_dfs))
+max_errors_y = 0
+error_figs = {}
+for title, df_win in window_dfs.items():
+    if not df_win.empty:
+        err_fig, agg_err = build_chart_errors_by_tipo(df_win, title)
+        if err_fig is not None and agg_err is not None and not agg_err.empty:
+            max_errors_y = max(max_errors_y, agg_err["qtd"].max())
+        error_figs[title] = (err_fig, agg_err)
+for (title, (fig, agg_err)), col in zip(error_figs.items(), cols_errors):
+    with col:
+        st.markdown(f"**{title}**")
+        if fig is None:
+            st.info("Sem erros.")
+            continue
+        if max_errors_y > 0:
+            fig.update_yaxes(range=[0, max_errors_y * 1.05])
+        st.plotly_chart(fig, use_container_width=True)
+        with st.expander("Tabela"):
+            st.dataframe(agg_err, use_container_width=True)
+            csv_err = agg_err.to_csv(index=False).encode("utf-8")
             st.download_button(
-                "Baixar CSV do período",
-                data=csv,
-                file_name=f"dados_{title.replace(' ', '_').lower()}.csv",
+                "Baixar CSV (erros)",
+                data=csv_err,
+                file_name=f"erros_{title.replace(' ', '_').lower()}.csv",
                 mime="text/csv",
-                key=f"dl_periodo_{title.replace(' ', '_').lower()}"
+                key=f"dl_errors_compare_{title.replace(' ', '_').lower()}"
             )
+
+# Dados brutos comparativos (opcional)
+st.subheader("Dados Brutos por Janela")
+cols_raw = st.columns(len(window_dfs))
+for (title, df_win), col in zip(window_dfs.items(), cols_raw):
+    with col:
+        st.markdown(f"**{title}**")
+        if df_win.empty:
+            st.info("Sem dados.")
+            continue
+        st.dataframe(df_win.sort_values(["dia", "status", "tipo"]), use_container_width=True, height=300)
+        csv = df_win.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Baixar CSV",
+            data=csv,
+            file_name=f"dados_{title.replace(' ', '_').lower()}.csv",
+            mime="text/csv",
+            key=f"dl_periodo_compare_{title.replace(' ', '_').lower()}"
+        )
 
 ## (Exportações removidas conforme solicitação)
 
