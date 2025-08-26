@@ -65,6 +65,7 @@ def is_error_status(s: str) -> bool:
     return (
         "erro" in s
         or "error" in s
+        or "integrado_parcial" in s
         or "fail" in s
         or s in {"nok", "falha", "failed"}
     )
