@@ -239,7 +239,7 @@ for (title, mask), tab in zip(masks.items(), abas):
 # Rodapé
 # =============================
 st.markdown(
-"- Rode a query abaixo:\n"
+"Rode a query abaixo:\n"
 "select  count(*) as qtd, status, data_integracao, tipo, sis.parent_type from saude_integracao si\n"
 "inner join saude_integracao_saude_integracao_situacao_1_c sisisc on sisisc.saude_integracao_saude_integracao_situacao_1saude_integracao_ida = si.id and si.deleted = 0\n"
 "inner join saude_integracao_situacao sis on sisisc.saude_intece37ituacao_idb = sis.id and sis.deleted = 0\n"
@@ -247,8 +247,8 @@ st.markdown(
 "AND si.data_integracao >= (CURDATE() - INTERVAL 30 DAY)\n"
 "group by status, data_integracao, tipo, sis.parent_type\n"
 "\n"
-"- Exporte para CSV\n"
-"- Faça no upload no App"
+"Exporte para CSV\n"
+"Faça no upload no App"
 )
 
 # =============================
