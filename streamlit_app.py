@@ -273,10 +273,19 @@ def build_chart_by_status(df_window: pd.DataFrame, title_suffix: str):
         x="dia",
         y="qtd",
         color="status",
+        text="qtd",
         title=f"Integrações por dia e status — {title_suffix}",
         labels={"dia": "Dia", "qtd": "Quantidade", "status": "Status"},
         color_discrete_map=color_map,
     )
+    fig.update_traces(
+        texttemplate="%{text}",
+        textposition="outside",
+        cliponaxis=False,
+    )
+    # Evita poluição visual se houver barras demais
+    if len(agg) > 120:
+        fig.update_traces(textposition="none")
     # Ordena legenda: Sucessos primeiro (não erro), depois erros
     ordered = sorted(agg["status"].unique(), key=lambda s: (is_error_status(str(s)), str(s)))
     fig.update_layout(legend=dict(traceorder="normal"))
@@ -323,10 +332,18 @@ def build_chart_errors_by_tipo(df_window: pd.DataFrame, title_suffix: str, top_n
         x="dia",
         y="qtd",
         color="tipo",
+        text="qtd",
         barmode="group",
-        title=f"Erros por tipo (Ao longo do tempo — {title_suffix}",
+        title=f"Erros por tipo ao longo do tempo — {title_suffix}",
         labels={"dia": "Dia", "qtd": "Quantidade", "tipo": "Tipo"},
     )
+    fig.update_traces(
+        texttemplate="%{text}",
+        textposition="outside",
+        cliponaxis=False,
+    )
+    if len(agg) > 120:
+        fig.update_traces(textposition="none")
     return fig, agg
 
 
