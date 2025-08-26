@@ -116,14 +116,14 @@ def chart_errors_by_parent_type(df_window: pd.DataFrame, title_suffix: str, top_
         st.info("Não há linhas de erro para este período.")
         return
 
-    # Top N parent_types por soma de erros no período
+    # Top N tipos por soma de erros no período
     top = (
-        df_err.groupby("parent_type")["qtd"].sum().nlargest(top_n).index.tolist()
+        df_err.groupby("tipo")["qtd"].sum().nlargest(top_n).index.tolist()
     )
-    df_top = df_err[df_err["parent_type"].isin(top)]
+    df_top = df_err[df_err["tipo"].isin(top)]
 
     agg = (
-        df_top.groupby(["dia", "parent_type"], as_index=False)["qtd"].sum()
+        df_top.groupby(["dia", "tipo"], as_index=False)["qtd"].sum()
         .sort_values(["dia", "qtd"], ascending=[True, False])
     )
 
@@ -131,20 +131,20 @@ def chart_errors_by_parent_type(df_window: pd.DataFrame, title_suffix: str, top_
         agg,
         x="dia",
         y="qtd",
-        color="parent_type",
+        color="tipo",
         barmode="group",
-        title=f"Erros por parent_type (Top {top_n}) ao longo do tempo — {title_suffix}",
-        labels={"dia": "Dia", "qtd": "Quantidade", "parent_type": "Parent Type"},
+        title=f"Erros por tipo (Top {top_n}) ao longo do tempo — {title_suffix}",
+        labels={"dia": "Dia", "qtd": "Quantidade", "tipo": "Tipo"},
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    with st.expander("Ver tabela detalhada (erros por dia x parent_type)"):
+    with st.expander("Ver tabela detalhada (erros por dia x tipo)"):
         st.dataframe(agg, use_container_width=True)
         csv = agg.to_csv(index=False).encode("utf-8")
         st.download_button(
-            "Baixar CSV (erros por dia x parent_type)",
+            "Baixar CSV (erros por dia x tipo)",
             data=csv,
-            file_name=f"erros_por_dia_parent_type_{title_suffix.replace(' ', '_').lower()}.csv",
+            file_name=f"erros_por_dia_tipo_{title_suffix.replace(' ', '_').lower()}.csv",
             mime="text/csv",
             key=f"dl_errors_{title_suffix.replace(' ', '_').lower()}"
         )
@@ -225,7 +225,7 @@ for (title, mask), tab in zip(masks.items(), abas):
 
         # Tabela base do período (opcional)
         with st.expander("Ver dados brutos do período"):
-            st.dataframe(df_win.sort_values(["dia", "status", "parent_type"]), use_container_width=True)
+            st.dataframe(df_win.sort_values(["dia", "status", "tipo"]), use_container_width=True)
             csv = df_win.to_csv(index=False).encode("utf-8")
             st.download_button(
                 "Baixar CSV do período",
