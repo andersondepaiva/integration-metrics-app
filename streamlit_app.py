@@ -1,4 +1,5 @@
 import io
+import tempfile
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -88,12 +89,18 @@ def kpi_row(df_window: pd.DataFrame):
 
 
 def chart_by_status(df_window: pd.DataFrame, title_suffix: str):
-    # Agrega por dia + status somando a qtd, pois o CSV já vem agregado na origem
+    fig = build_chart_by_status(df_window, title_suffix)
+    st.plotly_chart(fig, use_container_width=True)
+    return fig
+
+
+def build_chart_by_status(df_window: pd.DataFrame, title_suffix: str):
+    """Retorna fig Plotly de integrações por dia e status."""
     agg = (
         df_window.groupby(["dia", "status"], as_index=False)["qtd"].sum()
         .sort_values("dia")
     )
-    fig = px.bar(
+    return px.bar(
         agg,
         x="dia",
         y="qtd",
@@ -101,39 +108,14 @@ def chart_by_status(df_window: pd.DataFrame, title_suffix: str):
         title=f"Integrações por dia e status — {title_suffix}",
         labels={"dia": "Dia", "qtd": "Quantidade"},
     )
-    st.plotly_chart(fig, use_container_width=True)
 
 
 def chart_errors_by_tipo(df_window: pd.DataFrame, title_suffix: str, top_n: int = 8):
-    # Filtra somente linhas de erro
-    err_mask = df_window["status"].apply(is_error_status)
-    df_err = df_window.loc[err_mask].copy()
-    if df_err.empty:
+    fig, agg = build_chart_errors_by_tipo(df_window, title_suffix, top_n)
+    if fig is None:
         st.info("Não há linhas de erro para este período.")
-        return
-
-    # Top N tipos por soma de erros no período
-    top = (
-        df_err.groupby("tipo")["qtd"].sum().nlargest(top_n).index.tolist()
-    )
-    df_top = df_err[df_err["tipo"].isin(top)]
-
-    agg = (
-        df_top.groupby(["dia", "tipo"], as_index=False)["qtd"].sum()
-        .sort_values(["dia", "qtd"], ascending=[True, False])
-    )
-
-    fig = px.bar(
-        agg,
-        x="dia",
-        y="qtd",
-        color="tipo",
-        barmode="group",
-        title=f"Erros por tipo (Top {top_n}) ao longo do tempo — {title_suffix}",
-        labels={"dia": "Dia", "qtd": "Quantidade", "tipo": "Tipo"},
-    )
+        return None
     st.plotly_chart(fig, use_container_width=True)
-
     with st.expander("Ver tabela detalhada (erros por dia x tipo)"):
         st.dataframe(agg, use_container_width=True)
         csv = agg.to_csv(index=False).encode("utf-8")
@@ -144,6 +126,33 @@ def chart_errors_by_tipo(df_window: pd.DataFrame, title_suffix: str, top_n: int 
             mime="text/csv",
             key=f"dl_errors_{title_suffix.replace(' ', '_').lower()}"
         )
+    return fig
+
+
+def build_chart_errors_by_tipo(df_window: pd.DataFrame, title_suffix: str, top_n: int = 8):
+    """Retorna (fig, agg) ou (None, None) se não houver erros."""
+    err_mask = df_window["status"].apply(is_error_status)
+    df_err = df_window.loc[err_mask].copy()
+    if df_err.empty:
+        return None, None
+    top = (
+        df_err.groupby("tipo")["qtd"].sum().nlargest(top_n).index.tolist()
+    )
+    df_top = df_err[df_err["tipo"].isin(top)]
+    agg = (
+        df_top.groupby(["dia", "tipo"], as_index=False)["qtd"].sum()
+        .sort_values(["dia", "qtd"], ascending=[True, False])
+    )
+    fig = px.bar(
+        agg,
+        x="dia",
+        y="qtd",
+        color="tipo",
+        barmode="group",
+        title=f"Erros por tipo (Top {top_n}) ao longo do tempo — {title_suffix}",
+        labels={"dia": "Dia", "qtd": "Quantidade", "tipo": "Tipo"},
+    )
+    return fig, agg
 
 
 # =============================
@@ -229,6 +238,59 @@ for (title, mask), tab in zip(masks.items(), abas):
                 mime="text/csv",
                 key=f"dl_periodo_{title.replace(' ', '_').lower()}"
             )
+
+# =============================
+# Exportação PDF (todas as abas)
+# =============================
+st.subheader("Exportação")
+if st.button("📄 Exportar PDF (todas as abas)"):
+    from fpdf import FPDF
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=12)
+    for title, mask in masks.items():
+        df_win = df.loc[mask].copy()
+        pdf.add_page()
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 10, f"{title}", ln=1)
+        if df_win.empty:
+            pdf.set_font("Helvetica", size=10)
+            pdf.multi_cell(0, 6, "Sem dados para este período.")
+            continue
+        # Métricas
+        total = int(df_win["qtd"].sum())
+        erros = int(df_win.loc[df_win["status"].apply(is_error_status), "qtd"].sum())
+        sucesso = total - erros
+        pdf.set_font("Helvetica", size=10)
+        pdf.multi_cell(0, 6, f"Total: {total}  |  Sucesso (est.): {sucesso}  |  Erros (est.): {erros}")
+        # Gráficos
+        status_fig = build_chart_by_status(df_win, title)
+        errors_fig, _ = build_chart_errors_by_tipo(df_win, title)
+        figures = [(status_fig, "status"), (errors_fig, "erros")]
+        for fig, tag in figures:
+            if fig is None:
+                continue
+            try:
+                img_bytes = fig.to_image(format="png")  # requer kaleido
+            except Exception as e:
+                pdf.set_font("Helvetica", size=8)
+                pdf.set_text_color(200, 0, 0)
+                pdf.multi_cell(0, 5, f"Falha ao gerar imagem ({tag}): {e}")
+                pdf.set_text_color(0, 0, 0)
+                continue
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                tmp.write(img_bytes)
+                tmp_path = tmp.name
+            # Ajuste de largura mantendo margem
+            page_width = pdf.w - 20
+            pdf.image(tmp_path, w=page_width)
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    st.download_button(
+        "Baixar PDF",
+        data=pdf_bytes,
+        file_name="integracoes_metricas.pdf",
+        mime="application/pdf",
+        key="download_pdf_all_tabs"
+    )
 
 # =============================
 # Rodapé
