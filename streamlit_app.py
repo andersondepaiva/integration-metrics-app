@@ -24,6 +24,36 @@ st.caption(
     " e destaca as integrações com mais erros (por tipo)."
 )
 
+st.markdown(
+    "Query base utilizada (se alterar, mantenha a estrutura):"
+)
+st.code(
+    """select
+    count(*) as qtd,
+    status,
+    data_integracao,
+    coalesce(operacao, sis.parent_type) as tipo
+from saude_integracao si
+inner join saude_integracao_saude_integracao_situacao_1_c sisisc
+    on sisisc.saude_integracao_saude_integracao_situacao_1saude_integracao_ida = si.id
+    and si.deleted = 0
+inner join saude_integracao_situacao sis
+    on sisisc.saude_intece37ituacao_idb = sis.id
+    and sis.deleted = 0
+where data_integracao is not null
+    and parent_type is not null
+    and tipo = 'envio'
+    AND si.data_integracao >= (CURDATE() - INTERVAL 30 DAY)
+group by
+    status,
+    data_integracao,
+    coalesce(operacao, sis.parent_type),
+    sis.parent_type;
+""",
+    language="sql"
+)
+st.markdown("Exporte para CSV e faça o upload no App.")
+
 # Paleta de cores
 SUCCESS_COLOR = "#7defa1"   # verde claro
 ERROR_COLOR = "#FFABAB"     # vermelho claro (erros)
@@ -542,35 +572,7 @@ for (title, df_win), col in zip(window_dfs.items(), cols_raw):
 # =============================
 # Rodapé
 # =============================
-st.markdown(
-    "Query base utilizada (se alterar, mantenha a estrutura):"
-)
-st.code(
-    """select
-    count(*) as qtd,
-    status,
-    data_integracao,
-    coalesce(operacao, sis.parent_type) as tipo
-from saude_integracao si
-inner join saude_integracao_saude_integracao_situacao_1_c sisisc
-    on sisisc.saude_integracao_saude_integracao_situacao_1saude_integracao_ida = si.id
-    and si.deleted = 0
-inner join saude_integracao_situacao sis
-    on sisisc.saude_intece37ituacao_idb = sis.id
-    and sis.deleted = 0
-where data_integracao is not null
-    and parent_type is not null
-    and tipo = 'envio'
-    AND si.data_integracao >= (CURDATE() - INTERVAL 30 DAY)
-group by
-    status,
-    data_integracao,
-    coalesce(operacao, sis.parent_type),
-    sis.parent_type;
-""",
-    language="sql"
-)
-st.markdown("Exporte para CSV e faça o upload no App.")
+
 
 # =============================
 # requirements.txt (gerado automaticamente)
