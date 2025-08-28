@@ -17,7 +17,7 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("📈 Dashboard Integração CRM -> Nótus (2)")
+st.title("📈 Dashboard Integração CRM -> Nótus ")
 st.caption(
     "Faça upload do CSV gerado pela sua query (colunas esperadas: qtd, status, data_integracao, tipo).\n"
     "O app calcula uma visão do dia atual (com base no último dia do dataset), últimos 7 dias e últimos 30 dias,"
