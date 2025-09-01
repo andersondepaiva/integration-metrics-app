@@ -42,7 +42,7 @@ inner join saude_integracao_situacao sis
     and sis.deleted = 0
 where data_integracao is not null
     and parent_type is not null
-    and tipo = 'envio'
+    and tipo = 'envio' and situacao <> 'erro_origem'
     AND si.data_integracao >= (CURDATE() - INTERVAL 30 DAY)
 group by
     status,
